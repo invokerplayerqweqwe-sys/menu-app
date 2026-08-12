@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Блокнот Официанта</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Защита от случайного выделения и зума на iPhone */
+    * {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    input {
+      -webkit-user-select: auto;
+      user-select: auto;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 h-full text-gray-800 flex flex-col font-sans pb-safe">
+
+  <!-- Шапка -->
+  <header class="bg-indigo-600 text-white pt-10 pb-3 px-4 shadow-md sticky top-0 z-30">
+    <div class="max-w-md mx-auto flex justify-between items-center">
+      <h1 class="font-bold text-lg flex items-center gap-2">
+        <i class="fa-solid fa-utensils"></i> Официант App
+      </h1>
+      <span id="order-badge" class="bg-red-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full hidden">
+        0
+      </span>
+    </div>
+  </header>
+
+  <!-- Навигация по вкладкам -->
+  <nav class="bg-white border-b border-gray-200 sticky top-[68px] z-20 shadow-sm">
+    <div class="max-w-md mx-auto flex">
+      <button onclick="switchTab('availability')" id="tab-availability" class="flex-1 py-3 text-center font-medium border-b-2 border-indigo-600 text-indigo-600">
+        <i class="fa-solid fa-clipboard-check mr-1"></i> 1. Наличие (Кухня)
+      </button>
+      <button onclick="switchTab('order')" id="tab-order" class="flex-1 py-3 text-center font-medium text-gray-500 border-b-2 border-transparent">
+        <i class="fa-solid fa-cart-shopping mr-1"></i> 2. Приём заказа
+      </button>
+    </div>
+  </nav>
+
+  <!-- Основной контент -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 pb-36 overflow-y-auto">
+
+    <!-- Вкладка 1: Простановка наличия блюд -->
+    <section id="view-availability" class="space-y-3">
+      <div class="bg-amber-50 p-3 rounded-xl text-xs text-amber-800 border border-amber-200 mb-3 flex items-start gap-2">
+        <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>
+        <span>Отметьте <b>«+ Есть»</b> у блюд в наличии. Только они отобразятся во вкладке приёма заказа.</span>
+      </div>
+
+      <!-- Категории для кухни -->
+      <div class="flex gap-2 overflow-x-auto pb-2 mb-2 no-scrollbar" id="categories-avail"></div>
+
+      <div id="availability-menu-list" class="space-y-2"></div>
+    </section>
+
+    <!-- Вкладка 2: Прием заказа -->
+    <section id="view-order" class="hidden space-y-3">
+      <!-- Категории для заказа -->
+      <div class="flex gap-2 overflow-x-auto pb-2 mb-2 no-scrollbar" id="categories-order"></div>
+
+      <div id="order-menu-list" class="space-y-2"></div>
+    </section>
+
+  </main>
+
+  <!-- Нижняя панель с итогом заказа -->
+  <div id="cart-drawer" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] p-4 max-w-md mx-auto z-40 rounded-t-2xl">
+    <div class="flex justify-between items-center mb-2">
+      <span class="font-bold text-gray-700 text-sm">Выбрано в заказ:</span>
+      <span id="cart-total" class="font-black text-xl text-indigo-600">0 ₽</span>
+    </div>
+    
+    <div id="cart-items-summary" class="max-h-28 overflow-y-auto mb-3 text-xs divide-y divide-gray-100">
+      <p class="text-gray-400 italic py-1">Заказ пуст</p>
+    </div>
+
+    <div class="flex gap-2">
+      <button onclick="clearCart()" class="w-1/3 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 py-3 rounded-xl text-sm font-semibold transition">
+        Очистить
+      </button>
+      <button onclick="submitOrder()" class="w-2/3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white py-3 rounded-xl text-sm font-semibold transition flex justify-center items-center gap-2 shadow-md">
+        <i class="fa-solid fa-check"></i> Готово
+      </button>
+    </div>
+  </div>
+
+  <!-- Окно создания заказа -->
+  <div id="order-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-xl">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-bold text-lg">Новый заказ</h2>
+        <button onclick="closeOrderModal()" class="w-8 h-8 rounded-full bg-gray-100 text-gray-600">×</button>
+      </div>
+      <label class="block text-sm font-semibold text-gray-700 mb-1">Название заказа</label>
+      <input id="order-name-input" type="text" maxlength="60" placeholder="Например: Стол 5"
+        class="w-full border border-gray-200 rounded-xl px-3 py-3 mb-4 outline-none focus:ring-2 focus:ring-indigo-500">
+      <label class="block text-sm font-semibold text-gray-700 mb-1">Примечание</label>
+      <textarea id="order-note-input" rows="4" maxlength="300" placeholder="Например: без лука, принести позже"
+        class="w-full border border-gray-200 rounded-xl px-3 py-3 mb-4 outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+      <div class="flex gap-2">
+        <button onclick="closeOrderModal()" class="w-1/3 bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold">Отмена</button>
+        <button onclick="saveNewOrder()" class="w-2/3 bg-indigo-600 text-white py-3 rounded-xl font-semibold">Создать заказ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Меню из ваших фото
+    const defaultMenu = [
+      { id: 1, name: 'Соленый наполеон 150г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 400, desc: 'сало, бородинский хлеб, тобико, укроп'.replaceAll("\\'","'"), available: false },
+      { id: 2, name: 'Рийет из подкопченной форели 150г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 550, desc: 'копченая форель, миндаль, редис, бородинский хлеб, зелень'.replaceAll("\\'","'"), available: false },
+      { id: 3, name: 'Тар-тар из сельди с беби-картофелем 180г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 450, desc: 'филе сельди, вяленые томаты, бородинский хлеб, зелень'.replaceAll("\\'","'"), available: false },
+      { id: 4, name: 'Битые огурцы с кешью 180г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 300, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 5, name: 'Тар-тар из говядины и с домашним багетом 110г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 750, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 6, name: 'Ассорти из свежих овощей и зелени 240г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 400, desc: 'томат, огурец, сладкий перец, редис и зелень'.replaceAll("\\'","'"), available: false },
+      { id: 7, name: 'Ассорти солений 400г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 500, desc: 'томат, огурец, капуста гурийская, опята маринованные'.replaceAll("\\'","'"), available: false },
+      { id: 8, name: 'Ассорти благородных сыров 350г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 950, desc: 'камамбер, пармезан, дор-блю, сыр с грецким орехом, орех, мед'.replaceAll("\\'","'"), available: false },
+      { id: 9, name: 'Ассорти мясных деликатесов 310г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 1300, desc: 'подается с вялеными томатами, оливками, багет'.replaceAll("\\'","'"), available: false },
+      { id: 10, name: 'Форель слабой соли 150г'.replaceAll("\\'","'"), category: 'Холодные закуски'.replaceAll("\\'","'"), price: 950, desc: 'подается с багетом и творожным сыром'.replaceAll("\\'","'"), available: false },
+      { id: 11, name: 'Пряные крылья от Шефа 8шт'.replaceAll("\\'","'"), category: 'Горячие закуски'.replaceAll("\\'","'"), price: 580, desc: 'крылья куриные, соус BBQ, соус блю-чиз'.replaceAll("\\'","'"), available: false },
+      { id: 12, name: 'Хрустящие креветки с соусом васаби и унаги 150г'.replaceAll("\\'","'"), category: 'Горячие закуски'.replaceAll("\\'","'"), price: 800, desc: 'спринг-тесто, тигровые креветки, кунжут'.replaceAll("\\'","'"), available: false },
+      { id: 13, name: 'Чесночные гренки 200г'.replaceAll("\\'","'"), category: 'Горячие закуски'.replaceAll("\\'","'"), price: 250, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 14, name: 'Картофель фри / беби печеный / пюре 200г'.replaceAll("\\'","'"), category: 'Гарниры'.replaceAll("\\'","'"), price: 200, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 15, name: 'Овощи на гриле 200г'.replaceAll("\\'","'"), category: 'Гарниры'.replaceAll("\\'","'"), price: 300, desc: 'баклажан, болгарский перец, томат'.replaceAll("\\'","'"), available: false },
+      { id: 16, name: 'Теплый салат с телятиной и авокадо 210г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 950, desc: 'телятина, микс салата, филе апельсина, соус унаги, бальзамик, черри'.replaceAll("\\'","'"), available: false },
+      { id: 17, name: 'Греческий салат с кремом из брынзы и базилика 210г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 450, desc: 'микс салата, перец сладкий, томат, огурец, оливки, брынза, базилик'.replaceAll("\\'","'"), available: false },
+      { id: 18, name: 'Цезарь с курицей 220г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 500, desc: 'салат, филе куриное, пармезан, крутоны из багета, соус цезарь, черри'.replaceAll("\\'","'"), available: false },
+      { id: 19, name: 'Оливье по-царски 250г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 550, desc: 'традиционный салат с тигровыми креветками'.replaceAll("\\'","'"), available: false },
+      { id: 20, name: 'Салат с бужениной и молодым картофелем 250г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 680, desc: 'буженина, беби-картофель, бекон, мед, горчица, масло растительное, айсберг, огурец слабой соли'.replaceAll("\\'","'"), available: false },
+      { id: 21, name: 'Овощной из баклажанов и двух видов томатов 250г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 550, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 22, name: 'Салат с цыпленком и апельсином 220г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 500, desc: 'филе цыпленка, микс салатов, филе апельсина, черри, лук фри, заправка медово-горчичная'.replaceAll("\\'","'"), available: false },
+      { id: 23, name: 'Грузинский салат 250г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 700, desc: 'филе говядины, баклажаны, помидоры, перец болгарский, грецкий орех, лук красный, кинза'.replaceAll("\\'","'"), available: false },
+      { id: 24, name: 'Салат с авокадо и креветками 180г'.replaceAll("\\'","'"), category: 'Салаты'.replaceAll("\\'","'"), price: 700, desc: 'авокадо, микс салатов, тигровые креветки, заправка'.replaceAll("\\'","'"), available: false },
+      { id: 25, name: 'Борщ с говяжьими щечками 250мл'.replaceAll("\\'","'"), category: 'Супы'.replaceAll("\\'","'"), price: 450, desc: 'подается со сметаной и салом'.replaceAll("\\'","'"), available: false },
+      { id: 26, name: 'Том-ям с морепродуктами 250мл'.replaceAll("\\'","'"), category: 'Супы'.replaceAll("\\'","'"), price: 650, desc: 'идеальное сочетание куриного бульона, тыквы, груши и кокосового молока, пикантная нота азиатских пряностей'.replaceAll("\\'","'"), available: false },
+      { id: 27, name: 'Крем-суп из овощей с беконом и пармезаном 250мл'.replaceAll("\\'","'"), category: 'Супы'.replaceAll("\\'","'"), price: 350, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 28, name: 'Крем-суп из тыквы с креветкой 250мл'.replaceAll("\\'","'"), category: 'Супы'.replaceAll("\\'","'"), price: 450, desc: 'тыква, креветка, сливки, креветочный биск'.replaceAll("\\'","'"), available: false },
+      { id: 29, name: 'Паста Карбонара 250г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 500, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 30, name: 'Говяжьи щечки 300г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 800, desc: 'щечки говяжьи, картофельное имбирное пюре, соус демиглас'.replaceAll("\\'","'"), available: false },
+      { id: 31, name: 'Стейк из говяжьей вырезки с пестрым салатом 300г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 950, desc: 'говяжья вырезка, морковь, огурец, кинза, кунжутное масло, соус кальби, салат'.replaceAll("\\'","'"), available: false },
+      { id: 32, name: 'Судак с овощными тальятелле и соусом том-ям 300г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 690, desc: 'судак, морковь, лук порей, цукини'.replaceAll("\\'","'"), available: false },
+      { id: 33, name: 'Лосось из печи с карамельной морковью 300г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 950, desc: 'под соусом кимчи'.replaceAll("\\'","'"), available: false },
+      { id: 34, name: 'Бельканто 300г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 550, desc: 'что в переводе с итальянского «красивое пение»: нежное бедро цыпленка, рис, ореховый соус, филе апельсина, кунжут, кинза, соус унаги'.replaceAll("\\'","'"), available: false },
+      { id: 35, name: 'Бефстроганов с беби-картофелем 300г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 850, desc: 'филе говядины с грибами в сливочном соусе, с запеченным картофелем и маринованным огурчиком'.replaceAll("\\'","'"), available: false },
+      { id: 36, name: 'Свинина WOK 300г'.replaceAll("\\'","'"), category: 'Основные блюда'.replaceAll("\\'","'"), price: 750, desc: 'свинина, картофель, фасоль стручковая, лук под соусом WOK'.replaceAll("\\'","'"), available: false },
+      { id: 37, name: 'Барбекю на компанию 1500г'.replaceAll("\\'","'"), category: 'Блюда на мангале'.replaceAll("\\'","'"), price: 3700, desc: 'шашлык свиной, бедро куриное, пряные крылья, баранина на кости, овощи и шампиньоны на гриле, ассорти соусов, чиабатта'.replaceAll("\\'","'"), available: false },
+      { id: 38, name: 'Шашлык куриный 270г'.replaceAll("\\'","'"), category: 'Блюда на мангале'.replaceAll("\\'","'"), price: 500, desc: 'подается с шашлычным соусом, луком и зеленью'.replaceAll("\\'","'"), available: false },
+      { id: 39, name: 'Бедро куриное 270г'.replaceAll("\\'","'"), category: 'Блюда на мангале'.replaceAll("\\'","'"), price: 550, desc: 'подается с шашлычным соусом, луком и зеленью'.replaceAll("\\'","'"), available: false },
+      { id: 40, name: 'Шашлык свиной 270г'.replaceAll("\\'","'"), category: 'Блюда на мангале'.replaceAll("\\'","'"), price: 550, desc: 'подается с шашлычным соусом, луком и зеленью'.replaceAll("\\'","'"), available: false },
+      { id: 41, name: 'Соус 50г'.replaceAll("\\'","'"), category: 'Соусы'.replaceAll("\\'","'"), price: 80, desc: 'кисло-сладкий / устричный / чили-манго / аджика / ореховый / сырный'.replaceAll("\\'","'"), available: false },
+      { id: 42, name: 'Крем-суп из овощей и курицы 250мл'.replaceAll("\\'","'"), category: 'Детское меню'.replaceAll("\\'","'"), price: 250, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 43, name: 'Куриная лапша с перепелиным яйцом 250мл'.replaceAll("\\'","'"), category: 'Детское меню'.replaceAll("\\'","'"), price: 200, desc: 'лапша, перепелиное яйцо, куриный бульон, крутоны'.replaceAll("\\'","'"), available: false },
+      { id: 44, name: 'Фарфалле с курицей и овощами 250мл'.replaceAll("\\'","'"), category: 'Детское меню'.replaceAll("\\'","'"), price: 350, desc: 'паста, курица, черри, цукини, сливки'.replaceAll("\\'","'"), available: false },
+      { id: 45, name: 'Наггетсы и картофель фри 250г'.replaceAll("\\'","'"), category: 'Детское меню'.replaceAll("\\'","'"), price: 350, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 46, name: 'Мини шашлычок из курочки 170г'.replaceAll("\\'","'"), category: 'Детское меню'.replaceAll("\\'","'"), price: 350, desc: 'с кетчупом и овощами'.replaceAll("\\'","'"), available: false },
+      { id: 47, name: 'Гаспачо из клубники с мороженым и мятой'.replaceAll("\\'","'"), category: 'Десерты'.replaceAll("\\'","'"), price: 420, desc: 'клубника, пломбир, кешью'.replaceAll("\\'","'"), available: false },
+      { id: 48, name: 'Меренговый рулет с клубникой'.replaceAll("\\'","'"), category: 'Десерты'.replaceAll("\\'","'"), price: 400, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 49, name: 'Мороженое с ягодами 2 шарика'.replaceAll("\\'","'"), category: 'Десерты'.replaceAll("\\'","'"), price: 350, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 50, name: 'Карамельно-яблочный тарт'.replaceAll("\\'","'"), category: 'Десерты'.replaceAll("\\'","'"), price: 300, desc: ''.replaceAll("\\'","'"), available: false },
+      { id: 51, name: 'Хлебная корзина'.replaceAll("\\'","'"), category: 'Десерты'.replaceAll("\\'","'"), price: 200, desc: 'чиабатта, хлеб, багет домашний'.replaceAll("\\'","'"), available: false },
+    ];
+
+    const MENU_VERSION = '2';
+    let menu = localStorage.getItem('waiter_veranda_menu_version') === MENU_VERSION
+      ? (JSON.parse(localStorage.getItem('waiter_veranda_menu')) || defaultMenu)
+      : defaultMenu;
+    localStorage.setItem('waiter_veranda_menu', JSON.stringify(menu));
+    localStorage.setItem('waiter_veranda_menu_version', MENU_VERSION);
+    let order = {};
+    let completedOrders = JSON.parse(localStorage.getItem('waiter_veranda_orders')) || [];
+    let activeCategoryAvail = 'Все';
+    let activeCategoryOrder = 'Все';
+
+    function saveMenu() {
+      localStorage.setItem('waiter_veranda_menu', JSON.stringify(menu));
+    }
+
+    function switchTab(tab) {
+      const tabs = {
+        availability: document.getElementById('tab-availability'),
+        order: document.getElementById('tab-order'),
+        orders: document.getElementById('tab-orders')
+      };
+      const views = {
+        availability: document.getElementById('view-availability'),
+        order: document.getElementById('view-order'),
+        orders: document.getElementById('view-orders')
+      };
+
+      Object.keys(tabs).forEach(key => {
+        tabs[key].className = key === tab
+          ? "flex-1 py-3 text-center font-medium border-b-2 border-indigo-600 text-indigo-600"
+          : "flex-1 py-3 text-center font-medium text-gray-500 border-b-2 border-transparent";
+      });
+
+      Object.keys(views).forEach(key => {
+        views[key].classList.toggle('hidden', key !== tab);
+      });
+
+      document.getElementById('cart-drawer').classList.toggle('hidden', tab !== 'order');
+      render();
+    }
+
+    function renderCategories() {
+      const categories = ['Все', ...new Set(menu.map(i => i.category))];
+      
+      const containerAvail = document.getElementById('categories-avail');
+      containerAvail.innerHTML = categories.map(cat => `
+        <button onclick="setCategoryAvail('${cat}')" 
+          class="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+            activeCategoryAvail === cat 
+              ? 'bg-indigo-600 text-white' 
+              : 'bg-white text-gray-600 border border-gray-200'
+          }">
+          ${cat}
+        </button>
+      `).join('');
+
+      const containerOrder = document.getElementById('categories-order');
+      containerOrder.innerHTML = categories.map(cat => `
+        <button onclick="setCategoryOrder('${cat}')" 
+          class="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+            activeCategoryOrder === cat 
+              ? 'bg-indigo-600 text-white' 
+              : 'bg-white text-gray-600 border border-gray-200'
+          }">
+          ${cat}
+        </button>
+      `).join('');
+    }
+
+    function setCategoryAvail(cat) { activeCategoryAvail = cat; render(); }
+    function setCategoryOrder(cat) { activeCategoryOrder = cat; render(); }
+
+    function changeQuantity(id, delta) {
+      const current = order[id] || 0;
+      const next = current + delta;
+      if (next <= 0) {
+        delete order[id];
+      } else {
+        order[id] = next;
+      }
+      render();
+    }
+
+    function toggleAvailability(id, status) {
+      const item = menu.find(i => i.id === id);
+      if (item) {
+        item.available = status;
+        if (!status) delete order[id];
+        saveMenu();
+        render();
+      }
+    }
+
+    function clearCart() {
+      order = {};
+      render();
+    }
+
+    function submitOrder() {
+      if (Object.keys(order).length === 0) {
+        return alert('Вы не выбрали ни одного блюда!');
+      }
+      document.getElementById('order-name-input').value = '';
+      document.getElementById('order-note-input').value = '';
+      const modal = document.getElementById('order-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      setTimeout(() => document.getElementById('order-name-input').focus(), 50);
+    }
+
+    function closeOrderModal() {
+      const modal = document.getElementById('order-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function saveNewOrder() {
+      const name = document.getElementById('order-name-input').value.trim();
+      const note = document.getElementById('order-note-input').value.trim();
+
+      if (!name) return alert('Введите название заказа!');
+
+      const items = Object.keys(order).map(id => {
+        const item = menu.find(i => i.id == id);
+        return item ? { id: item.id, name: item.name, price: item.price, qty: order[id] } : null;
+      }).filter(Boolean);
+
+      const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+      completedOrders.unshift({
+        id: Date.now(),
+        name,
+        note,
+        items,
+        total,
+        createdAt: new Date().toLocaleString('ru-RU')
+      });
+
+      localStorage.setItem('waiter_veranda_orders', JSON.stringify(completedOrders));
+      order = {};
+      closeOrderModal();
+      switchTab('orders');
+    }
+
+    function deleteCompletedOrder(id) {
+      completedOrders = completedOrders.filter(item => item.id !== id);
+      localStorage.setItem('waiter_veranda_orders', JSON.stringify(completedOrders));
+      render();
+    }
+
+    function renderOrders() {
+      const container = document.getElementById('orders-list');
+
+      if (completedOrders.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-gray-300">
+            <i class="fa-solid fa-list-check text-gray-300 text-3xl mb-2"></i>
+            <p class="text-gray-500 font-medium text-sm">Заказов пока нет</p>
+            <p class="text-gray-400 text-xs mt-1">Нажмите «Готово» после оформления заказа.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = completedOrders.map(savedOrder => `
+        <div class="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+          <div class="flex justify-between items-start gap-3 mb-2">
+            <div>
+              <div class="font-bold text-gray-800">${escapeHtml(savedOrder.name)}</div>
+              <div class="text-[11px] text-gray-400">${savedOrder.createdAt}</div>
+            </div>
+            <button onclick="deleteCompletedOrder(${savedOrder.id})" class="text-gray-400 hover:text-red-500 px-2 py-1">Удалить</button>
+          </div>
+          <div class="space-y-1 mb-3">
+            ${savedOrder.items.map(item => `
+              <div class="flex justify-between text-sm">
+                <span>${escapeHtml(item.name)} <b class="text-indigo-600">×${item.qty}</b></span>
+                <span class="font-semibold">${item.price * item.qty} ₽</span>
+              </div>`).join('')}
+          </div>
+          ${savedOrder.note ? `<div class="bg-amber-50 border border-amber-100 rounded-xl p-2.5 text-xs text-amber-800 mb-3"><b>Примечание:</b> ${escapeHtml(savedOrder.note)}</div>` : ''}
+          <div class="flex justify-between items-center border-t border-gray-100 pt-2">
+            <span class="font-semibold text-gray-600">Итого</span>
+            <span class="font-black text-indigo-600">${savedOrder.total} ₽</span>
+          </div>
+        </div>`).join('');
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      }[char]));
+    }
+
+    function render() {
+      renderCategories();
+
+      // 1. Отрисовка Вкладки «Наличие»
+      const filteredAvailMenu = activeCategoryAvail === 'Все' 
+        ? menu 
+        : menu.filter(i => i.category === activeCategoryAvail);
+
+      const availList = document.getElementById('availability-menu-list');
+      availList.innerHTML = filteredAvailMenu.map(item => `
+        <div class="bg-white p-3 rounded-xl border border-gray-200 flex justify-between items-center shadow-sm">
+          <div class="pr-2">
+            <div class="font-semibold text-gray-800 text-sm">${item.name}</div>
+            ${item.desc ? `<div class="text-[11px] text-gray-400 leading-tight my-0.5">${item.desc}</div>` : ''}
+            <div class="text-xs text-indigo-600 font-bold">${item.price} ₽</div>
+          </div>
+          <div class="flex gap-1.5 shrink-0">
+            <button onclick="toggleAvailability(${item.id}, false)" 
+              class="px-3 py-2 rounded-xl font-bold text-xs transition ${!item.available ? 'bg-red-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'}">
+              - Нет
+            </button>
+            <button onclick="toggleAvailability(${item.id}, true)" 
+              class="px-3 py-2 rounded-xl font-bold text-xs transition ${item.available ? 'bg-emerald-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'}">
+              + Есть
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      // 2. Отрисовка Вкладки «Приём заказа» (только доступные)
+      const availableMenu = menu.filter(i => i.available);
+      const filteredOrderMenu = activeCategoryOrder === 'Все' 
+        ? availableMenu 
+        : availableMenu.filter(i => i.category === activeCategoryOrder);
+
+      const orderList = document.getElementById('order-menu-list');
+
+      if (availableMenu.length === 0) {
+        orderList.innerHTML = `
+          <div class="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-gray-300">
+            <i class="fa-solid fa-utensils text-gray-300 text-3xl mb-2"></i>
+            <p class="text-gray-500 font-medium text-sm">Нет блюд в наличии</p>
+            <p class="text-gray-400 text-xs mt-1">Отметьте блюда на кухне во вкладке «1. Наличие»</p>
+          </div>
+        `;
+      } else if (filteredOrderMenu.length === 0) {
+        orderList.innerHTML = `
+          <div class="text-center py-8 text-gray-400 text-xs">
+            В категории «${activeCategoryOrder}» нет блюд в наличии
+          </div>
+        `;
+      } else {
+        orderList.innerHTML = filteredOrderMenu.map(item => {
+          const qty = order[item.id] || 0;
+          return `
+            <div class="bg-white p-3 rounded-xl border border-gray-200 flex justify-between items-center shadow-sm">
+              <div class="flex-1 pr-2">
+                <div class="font-semibold text-gray-800 text-sm">${item.name}</div>
+                <div class="text-xs text-gray-500">${item.price} ₽</div>
+              </div>
+
+              <div class="flex items-center gap-2 bg-gray-100 p-1 rounded-xl">
+                <button onclick="changeQuantity(${item.id}, -1)" class="w-8 h-8 bg-white rounded-lg shadow-sm font-bold text-gray-700 active:bg-gray-200 flex items-center justify-center text-base">-</button>
+                <span class="w-6 text-center font-bold text-sm ${qty > 0 ? 'text-indigo-600' : 'text-gray-400'}">${qty}</span>
+                <button onclick="changeQuantity(${item.id}, 1)" class="w-8 h-8 bg-indigo-600 text-white rounded-lg shadow-sm font-bold active:bg-indigo-700 flex items-center justify-center text-base">+</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 3. Вкладка «Заказы»
+      renderOrders();
+
+      // 4. Обновление итогов
+      const summaryContainer = document.getElementById('cart-items-summary');
+      const keys = Object.keys(order);
+      let total = 0;
+      let totalCount = 0;
+
+      if (keys.length === 0) {
+        summaryContainer.innerHTML = '<p class="text-gray-400 italic py-1">Заказ пуст</p>';
+      } else {
+        summaryContainer.innerHTML = keys.map(id => {
+          const item = menu.find(i => i.id == id);
+          if (!item) return '';
+          const qty = order[id];
+          const cost = item.price * qty;
+          total += cost;
+          totalCount += qty;
+          return `
+            <div class="flex justify-between items-center py-1.5">
+              <span class="font-medium text-gray-700">${item.name} <b class="text-indigo-600">x${qty}</b></span>
+              <span class="font-semibold text-gray-900">${cost} ₽</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('cart-total').innerText = `${total} ₽`;
+      
+      const badge = document.getElementById('order-badge');
+      if (totalCount > 0) {
+        badge.innerText = totalCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>
